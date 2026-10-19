@@ -2,12 +2,14 @@ import { useEffect, useRef, useState } from 'react';
 import useReducedMotion from '../hooks/useReducedMotion.js';
 import { preloadWelcome } from '../lib/preloadWelcome.js';
 
-export default function OpeningEnvelope({ onComplete }) {
+export default function OpeningEnvelope({ onComplete, onOpen }) {
   const [progress, setProgress] = useState(0);
   const [ready, setReady] = useState(false);
   const [phase, setPhase] = useState('loading');
   const reducedMotion = useReducedMotion();
   const startedAt = useRef(performance.now());
+  const openButton = useRef(null);
+  const opened = useRef(false);
 
   useEffect(() => {
     const controller = new AbortController();
@@ -25,9 +27,20 @@ export default function OpeningEnvelope({ onComplete }) {
   useEffect(() => {
     if (!ready || phase !== 'loading') return;
     const elapsed = performance.now() - startedAt.current;
-    const timer = setTimeout(() => setPhase('opening'), reducedMotion ? 0 : Math.max(0, 1200 - elapsed));
+    const timer = setTimeout(() => setPhase('ready'), reducedMotion ? 0 : Math.max(0, 1200 - elapsed));
     return () => clearTimeout(timer);
   }, [ready, phase, reducedMotion]);
+
+  useEffect(() => {
+    if (phase === 'ready') openButton.current?.focus({ preventScroll: true });
+  }, [phase]);
+
+  function openLetter() {
+    if (phase !== 'ready' || opened.current) return;
+    opened.current = true;
+    onOpen?.();
+    setPhase('opening');
+  }
 
   useEffect(() => {
     if (phase !== 'opening') return;
@@ -57,6 +70,7 @@ export default function OpeningEnvelope({ onComplete }) {
       </div>
       <div className="opening-status">
         <p aria-live="polite" role="status">{phase === 'opening' ? 'Selamat ulang tahun, sayang.' : ready ? 'Surat kecilmu sudah siap.' : 'Sebentar ya, ada sesuatu untukmu…'}</p>
+        {phase === 'ready' && <button ref={openButton} className="opening-open-button" type="button" onClick={openLetter}>Buka suratnya <span aria-hidden="true">♡</span></button>}
         <div className="opening-progress" role="progressbar" aria-label="Menyiapkan ucapan" aria-valuemin={0} aria-valuemax={100} aria-valuenow={ready ? 100 : progress}>
           <span style={{ transform: `scaleX(${(ready ? 100 : progress) / 100})` }} />
         </div>

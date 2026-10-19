@@ -10,6 +10,7 @@ export default function useBirthdayPlayer({ audioRef, visible, introComplete }) 
   const volumeRef = useRef(birthdaySong.initialVolume);
   const lastAudible = useRef(birthdaySong.initialVolume || 40);
   const autoplayAttempted = useRef(false);
+  const openingPlayback = useRef(false);
   const mounted = useRef(false);
   const request = useRef(0);
   const visibleRef = useRef(visible);
@@ -38,7 +39,7 @@ export default function useBirthdayPlayer({ audioRef, visible, introComplete }) 
         setStatus(previous => ['loading', 'error'].includes(previous) ? 'ready' : previous);
       },
       playing: () => {
-        if (!visibleRef.current || document.hidden) { audio.pause(); return; }
+        if ((!visibleRef.current && !openingPlayback.current) || document.hidden) { audio.pause(); return; }
         setStatus('playing');
       },
       pause: () => setStatus(audio.ended ? 'ended' : 'paused'),
@@ -71,13 +72,14 @@ export default function useBirthdayPlayer({ audioRef, visible, introComplete }) 
   }, [audioRef, attempt]);
 
   const pause = useCallback(() => {
+    openingPlayback.current = false;
     request.current += 1;
     audioRef.current?.pause();
   }, [audioRef]);
 
-  const play = useCallback(async (fromBeginning = false) => {
+  const play = useCallback(async (fromBeginning = false, fromOpeningGesture = false) => {
     const audio = audioRef.current;
-    if (!audio || !ready || !visibleRef.current || document.hidden) return;
+    if (!audio || document.hidden || (!fromOpeningGesture && (!ready || !visibleRef.current))) return;
     const currentRequest = ++request.current;
     setStatus('starting');
     try {
@@ -96,13 +98,24 @@ export default function useBirthdayPlayer({ audioRef, visible, introComplete }) 
     }
   }, [audioRef, ready]);
 
+  const openFromGesture = useCallback(() => {
+    openingPlayback.current = true;
+    autoplayAttempted.current = true;
+    // Call play synchronously in the click handler, before animation timers or awaits.
+    // Native play can wait for audio data without losing the user's activation.
+    return play(true, true);
+  }, [play]);
+
   useEffect(() => {
     if (!introComplete || !visible || !ready || autoplayAttempted.current || document.hidden) return;
     autoplayAttempted.current = true;
     play(true);
   }, [introComplete, visible, ready, play]);
 
-  useEffect(() => { if (!visible) pause(); }, [visible, pause]);
+  useEffect(() => {
+    if (!visible) pause();
+    else openingPlayback.current = false;
+  }, [visible, pause]);
   useEffect(() => {
     const onVisibility = () => { if (document.hidden) pause(); };
     document.addEventListener('visibilitychange', onVisibility);
@@ -123,7 +136,7 @@ export default function useBirthdayPlayer({ audioRef, visible, introComplete }) 
   }, [audioRef]);
 
   return {
-    ready, status, volume, currentTime, setVolume, play, pause,
+    ready, status, volume, currentTime, setVolume, play, pause, openFromGesture,
     toggleMute: () => setVolume(volumeRef.current === 0 ? lastAudible.current : 0),
     retry: () => setAttempt(value => value + 1),
   };

@@ -1,5 +1,5 @@
 import { StrictMode } from 'react';
-import { act, render, screen } from '@testing-library/react';
+import { act, fireEvent, render, screen } from '@testing-library/react';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import App from '../App.jsx';
 import OpeningEnvelope from '../components/OpeningEnvelope.jsx';
@@ -12,6 +12,7 @@ let finishFonts;
 
 beforeEach(() => {
   vi.useFakeTimers();
+  vi.spyOn(document, 'hidden', 'get').mockReturnValue(false);
   images = [];
   const fontReady = new Promise(resolve => { finishFonts = resolve; });
   Object.defineProperty(document, 'fonts', { configurable: true, value: { load: vi.fn(() => fontReady) } });
@@ -44,8 +45,14 @@ async function finishAllAssets(options) {
 }
 
 describe('Amplop pembuka', () => {
-  it('menunggu foto dan font, membuka amplop, lalu mengaktifkan halaman', async () => {
+  it('menunggu ketukan dan memulai audio langsung sebelum animasi, tanpa menunggu canplay', async () => {
     const { container } = render(<StrictMode><App /></StrictMode>);
+    const audio = container.querySelector('audio');
+    audio.play.mockImplementation(function () {
+      Object.defineProperty(this, 'paused', { configurable: true, value: false });
+      this.dispatchEvent(new Event('playing'));
+      return Promise.resolve();
+    });
     const content = container.querySelector('.site-content');
     expect(content.hasAttribute('inert')).toBe(true);
     expect(screen.queryByRole('heading', { level: 1 })).toBeNull();
@@ -56,6 +63,14 @@ describe('Amplop pembuka', () => {
     expect(screen.getByRole('status').textContent).toContain('Sebentar ya');
     await act(async () => finishFonts([]));
     await act(async () => vi.advanceTimersByTimeAsync(1));
+    const open = screen.getByRole('button', { name: 'Buka suratnya' });
+    expect(document.activeElement).toBe(open);
+    await act(async () => vi.advanceTimersByTimeAsync(3000));
+    expect(audio.play).not.toHaveBeenCalled();
+    expect(content.hasAttribute('inert')).toBe(true);
+    fireEvent.click(open);
+    // No timer, effect, or await should separate the click from native play().
+    expect(audio.play).toHaveBeenCalledOnce();
     expect(screen.getByRole('status').textContent).toBe('Selamat ulang tahun, sayang.');
     expect(content.hasAttribute('inert')).toBe(true);
     await act(async () => vi.advanceTimersByTimeAsync(1700));
@@ -64,6 +79,24 @@ describe('Amplop pembuka', () => {
     expect(content.hasAttribute('inert')).toBe(false);
     expect(document.activeElement).toBe(screen.getByRole('main'));
     expect(document.body.style.overflow).toBe('');
+    fireEvent.canPlay(audio);
+    expect(audio.play).toHaveBeenCalledOnce();
+    expect(screen.getByRole('button', { name: 'Jeda lagu' })).not.toBeNull();
+  });
+
+  it('tetap membuka surat jika audio ditolak dan menyediakan Play tanpa mengulang otomatis', async () => {
+    const { container } = render(<StrictMode><App /></StrictMode>);
+    const audio = container.querySelector('audio');
+    audio.play.mockRejectedValueOnce(new DOMException('Playback blocked', 'NotAllowedError'));
+    fireEvent.canPlay(audio);
+    await finishAllAssets();
+    await act(async () => vi.advanceTimersByTimeAsync(1200));
+    await act(async () => fireEvent.click(screen.getByRole('button', { name: 'Buka suratnya' })));
+    await act(async () => vi.advanceTimersByTimeAsync(1700));
+    expect(screen.getByRole('heading', { level: 1 }).textContent).toContain('Cinut.');
+    expect(screen.getByText('Ketuk Play untuk memulai lagunya.')).not.toBeNull();
+    expect(screen.getByRole('button', { name: 'Putar lagu' }).disabled).toBe(false);
+    expect(audio.play).toHaveBeenCalledOnce();
   });
 
   it('tetap membuka halaman jika sebuah foto gagal dimuat', async () => {
@@ -73,6 +106,7 @@ describe('Amplop pembuka', () => {
     expect(screen.getByRole('progressbar').getAttribute('aria-valuenow')).toBe('100');
     await act(async () => vi.advanceTimersByTimeAsync(1200));
     expect(complete).not.toHaveBeenCalled();
+    fireEvent.click(screen.getByRole('button', { name: 'Buka suratnya' }));
     await act(async () => vi.advanceTimersByTimeAsync(1700));
     expect(complete).toHaveBeenCalledOnce();
   });
@@ -82,6 +116,7 @@ describe('Amplop pembuka', () => {
     render(<OpeningEnvelope onComplete={complete} />);
     await act(async () => vi.advanceTimersByTimeAsync(8000));
     await act(async () => vi.advanceTimersByTimeAsync(1));
+    fireEvent.click(screen.getByRole('button', { name: 'Buka suratnya' }));
     await act(async () => vi.advanceTimersByTimeAsync(1700));
     expect(complete).toHaveBeenCalledOnce();
   });
@@ -92,6 +127,8 @@ describe('Amplop pembuka', () => {
     render(<OpeningEnvelope onComplete={complete} />);
     await finishAllAssets();
     await act(async () => vi.advanceTimersByTimeAsync(1));
+    expect(complete).not.toHaveBeenCalled();
+    fireEvent.click(screen.getByRole('button', { name: 'Buka suratnya' }));
     await act(async () => vi.advanceTimersByTimeAsync(1));
     expect(complete).toHaveBeenCalledOnce();
   });

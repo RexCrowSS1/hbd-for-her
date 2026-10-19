@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState } from 'react';
+import { useEffect, useImperativeHandle, useRef, useState } from 'react';
 import { birthdaySong } from '../data/music.js';
 import useBirthdayPlayer from '../hooks/useBirthdayPlayer.js';
 
@@ -16,13 +16,14 @@ const messages = {
 
 const formatTime = seconds => `${Math.floor(seconds / 60)}:${String(Math.floor(seconds % 60)).padStart(2, '0')}`;
 
-export default function SoundToggle({ introComplete = false, obscured = false }) {
+export default function SoundToggle({ introComplete = false, obscured = false, openingPlayRef }) {
   const [expanded, setExpanded] = useState(false);
   const autoOpened = useRef(false);
   const buttonRef = useRef(null);
   const audioRef = useRef(null);
   const music = useBirthdayPlayer({ audioRef, visible: expanded && introComplete && !obscured, introComplete });
   const playing = music.status === 'playing';
+  useImperativeHandle(openingPlayRef, () => music.openFromGesture, [music.openFromGesture]);
 
   useEffect(() => {
     if (introComplete && !autoOpened.current) {

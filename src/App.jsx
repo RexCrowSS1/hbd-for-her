@@ -14,6 +14,8 @@ import { photos } from './data/photos.js';
 export default function App() {
   const [introComplete, setIntroComplete] = useState(false);
   const completeIntro = useCallback(() => setIntroComplete(true), []);
+  const openingPlayRef = useRef(null);
+  const openIntro = useCallback(() => openingPlayRef.current?.(), []);
   const mainRef = useRef(null);
   const [activePhoto, setActivePhoto] = useState(null);
   const photoOpener = useRef(null);
@@ -32,11 +34,11 @@ export default function App() {
 
   return (
     <>
-      {!introComplete && <OpeningEnvelope onComplete={completeIntro} />}
+      {!introComplete && <OpeningEnvelope onOpen={openIntro} onComplete={completeIntro} />}
       <div className="site-content" data-ready={introComplete} inert={!introComplete} aria-hidden={!introComplete}>
         <a className="skip-link" href="#main">Lewati ke isi</a>
         <ReadingProgress />
-        <Header introComplete={introComplete} musicObscured={activePhoto !== null} />
+        <Header introComplete={introComplete} musicObscured={activePhoto !== null} openingPlayRef={openingPlayRef} />
         <main id="main" ref={mainRef} tabIndex={-1}>
           <Hero onPhoto={openPhoto} />
           <LoveRibbon />
