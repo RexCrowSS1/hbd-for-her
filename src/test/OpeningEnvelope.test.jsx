@@ -62,7 +62,9 @@ describe('Amplop pembuka', () => {
     expect(screen.getByRole('progressbar').getAttribute('aria-valuenow')).toBe('50');
     expect(screen.getByRole('status').textContent).toContain('Sebentar ya');
     await act(async () => finishFonts([]));
-    await act(async () => vi.advanceTimersByTimeAsync(1));
+    expect(screen.getByRole('progressbar').getAttribute('aria-valuenow')).toBe('100');
+    expect(screen.queryByRole('button', { name: 'Buka suratnya' })).toBeNull();
+    await act(async () => vi.advanceTimersByTimeAsync(950));
     const open = screen.getByRole('button', { name: 'Buka suratnya' });
     expect(document.activeElement).toBe(open);
     await act(async () => vi.advanceTimersByTimeAsync(3000));
@@ -115,7 +117,7 @@ describe('Amplop pembuka', () => {
     const complete = vi.fn();
     render(<OpeningEnvelope onComplete={complete} />);
     await act(async () => vi.advanceTimersByTimeAsync(8000));
-    await act(async () => vi.advanceTimersByTimeAsync(1));
+    await act(async () => vi.advanceTimersByTimeAsync(950));
     fireEvent.click(screen.getByRole('button', { name: 'Buka suratnya' }));
     await act(async () => vi.advanceTimersByTimeAsync(1700));
     expect(complete).toHaveBeenCalledOnce();

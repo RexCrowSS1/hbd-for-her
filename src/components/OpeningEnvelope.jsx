@@ -27,7 +27,8 @@ export default function OpeningEnvelope({ onComplete, onOpen }) {
   useEffect(() => {
     if (!ready || phase !== 'loading') return;
     const elapsed = performance.now() - startedAt.current;
-    const timer = setTimeout(() => setPhase('ready'), reducedMotion ? 0 : Math.max(0, 1200 - elapsed));
+    // Let the final progress fill finish before fading into the opening button.
+    const timer = setTimeout(() => setPhase('ready'), reducedMotion ? 0 : Math.max(950, 1200 - elapsed));
     return () => clearTimeout(timer);
   }, [ready, phase, reducedMotion]);
 
@@ -69,12 +70,14 @@ export default function OpeningEnvelope({ onComplete, onOpen }) {
         <span className="opening-caption handwritten">a little surprise, just for you.</span>
       </div>
       <div className="opening-status">
-        <p aria-live="polite" role="status">{phase === 'opening' ? 'Selamat ulang tahun, sayang.' : ready ? 'Surat kecilmu sudah siap.' : 'Sebentar ya, ada sesuatu untukmu…'}</p>
-        {phase === 'ready' && <button ref={openButton} className="opening-open-button" type="button" onClick={openLetter}>Buka suratnya <span aria-hidden="true">♡</span></button>}
-        <div className="opening-progress" role="progressbar" aria-label="Menyiapkan ucapan" aria-valuemin={0} aria-valuemax={100} aria-valuenow={ready ? 100 : progress}>
-          <span style={{ transform: `scaleX(${(ready ? 100 : progress) / 100})` }} />
+        <p aria-live="polite" role="status"><span key={phase} className="opening-status-copy">{phase === 'opening' ? 'Selamat ulang tahun, sayang.' : phase === 'ready' ? 'Surat kecilmu sudah siap.' : 'Sebentar ya, ada sesuatu untukmu…'}</span></p>
+        <div className="opening-action">
+          {phase !== 'loading' && <button ref={openButton} className="opening-open-button" type="button" disabled={phase !== 'ready'} aria-hidden={phase !== 'ready'} tabIndex={phase === 'ready' ? 0 : -1} onClick={openLetter}>Buka suratnya <span aria-hidden="true">♡</span></button>}
+          <div className="opening-progress" role="progressbar" aria-hidden={phase !== 'loading'} aria-label="Menyiapkan ucapan" aria-valuemin={0} aria-valuemax={100} aria-valuenow={ready ? 100 : progress}>
+            <span style={{ transform: `scaleX(${(ready ? 100 : progress) / 100})` }} />
+          </div>
         </div>
-        <span className="opening-progress-label" aria-hidden="true">{ready ? 'DIBUAT DENGAN SAYANG' : `${String(progress).padStart(2, '0')} / 100`}</span>
+        <span key={phase} className="opening-progress-label" aria-hidden="true">{phase === 'loading' ? 'SEDANG DISIAPKAN UNTUKMU' : 'DIBUAT DENGAN SAYANG'}</span>
       </div>
       <span className="opening-footer">CENAT · CENUT · CINUT</span>
     </div>
